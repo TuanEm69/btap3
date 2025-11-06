@@ -21,6 +21,24 @@ Trong thời đại công nghệ 4.0, thương mại điện tử (E-commerce) t
 **- Containerization:** Docker Desktop để quản lý container backend, frontend, database.  
 **- Environment:** Linux (Ubuntu) chạy trong Docker Desktop.  
 ## **⚙️ 2. CẤU TRÚC DỰ ÁN**
-![Uploading image.png…]()
+<img width="626" height="709" alt="image" src="https://github.com/user-attachments/assets/220b95e8-0430-4ddf-94f3-eecc8ad7cc11" />  
+
+## **🧱 3. CÀI ĐẶT MÔI TRƯỜNG**  
+### **Bước 1️⃣: Cài đặt Docker Desktop**
+1. Tải về Docker Desktop  
+- Truy cập trang chính thức của Docker (https://www.docker.com/products/docker-desktop/).  
+- Nhấn vào nút “Download for Windows” và lưu file cài đặt .exe về máy.  
+2. Cài đặt Docker Desktop  
+- Mở file cài đặt vừa tải về (Docker Desktop Installer.exe).  
+- Trong quá trình cài đặt, tick chọn:  
+- Install required components for WSL 2 (nếu chưa cài).  
+- Add shortcut to desktop (nếu muốn).  
+- Nhấn OK và đợi quá trình cài đặt hoàn tất.  
+3. Khởi động và cấu hình lần đầu  
+- Sau khi cài xong, khởi động lại máy (nếu được yêu cầu).  
+- Mở Docker Desktop từ Start Menu hoặc biểu tượng trên desktop.  
+- Chấp nhận các điều khoản sử dụng (License Agreement).  
+- Docker sẽ tự động khởi động nền tảng WSL 2 và cấu hình mặc định.  
+4. Kiểm tra Docker đã hoạt động  
 
 
