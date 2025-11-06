@@ -21,7 +21,36 @@ Trong thời đại công nghệ 4.0, thương mại điện tử (E-commerce) t
 **- Containerization:** Docker Desktop để quản lý container backend, frontend, database.  
 **- Environment:** Linux (Ubuntu) chạy trong Docker Desktop.  
 ## **⚙️ 2. CẤU TRÚC DỰ ÁN**
-<img width="626" height="709" alt="image" src="https://github.com/user-attachments/assets/220b95e8-0430-4ddf-94f3-eecc8ad7cc11" />  
+```ecommerce-pc/
+│
+├── backend/                
+│   ├── app.js              # Entry point của server
+│   ├── routes/             # Route API (users, products, orders)
+│   ├── controllers/        # Logic xử lý cho từng route
+│   ├── models/             # Schema database
+│   └── utils/              # Hàm tiện ích (hash password, JWT...)
+│
+├── frontend/               
+│   ├── public/             # HTML, favicon, assets tĩnh
+│   ├── src/
+│   │   ├── components/     # Component UI (Navbar, ProductCard…)
+│   │   ├── pages/          # Các trang (Home, ProductDetail, Cart, Checkout)
+│   │   ├── services/       # Gọi API backend
+│   │   └── App.js
+│   └── package.json
+│
+├── database/               
+│   ├── init.sql            # Script khởi tạo bảng và dữ liệu mẫu
+│   └── docker-compose.yml  # Cấu hình MySQL/PostgreSQL
+│
+├── docker/                 
+│   ├── Dockerfile.backend
+│   ├── Dockerfile.frontend
+│   └── docker-compose.yml  # Kết hợp frontend, backend, database
+│
+├── docs/                   
+└── README.md               
+```
 
 ## **🧱 3. CÀI ĐẶT MÔI TRƯỜNG**  
 ### **Bước 1️⃣: Cài đặt Docker Desktop**
@@ -40,5 +69,110 @@ Trong thời đại công nghệ 4.0, thương mại điện tử (E-commerce) t
 - Chấp nhận các điều khoản sử dụng (License Agreement).  
 - Docker sẽ tự động khởi động nền tảng WSL 2 và cấu hình mặc định.  
 4. Kiểm tra Docker đã hoạt động  
+### **Bước 2️⃣:Cấu hình docker compose**
+1. File docker compose:
+```
+services:
+  mariadb:
+    image: mariadb:latest
+    container_name: mariadb
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: appdb
+      MYSQL_USER: user
+      MYSQL_PASSWORD: user123
+    volumes:
+      - ./data/mariadb:/var/lib/mysql
+    ports:
+      - "3306:3306"
+  
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: phpmyadmin
+    restart: always
+    environment:
+      PMA_HOST: mariadb
+      PMA_USER: root
+      PMA_PASSWORD: root
+    ports:
+      - "8080:80"
+    depends_on:
+      - mariadb
 
+  nodered:
+    image: nodered/node-red:latest
+    container_name: nodered
+    restart: always
+    ports:
+      - "1880:1880"
+    volumes:
+      - ./data/nodered:/data
+
+  influxdb:
+    image: influxdb:latest
+    container_name: influxdb
+    restart: always
+    ports:
+      - "8086:8086"
+    volumes:
+      - ./data/influxdb:/var/lib/influxdb
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: always
+    ports:
+      - "3000:3000"
+    depends_on:
+      - influxdb
+    volumes:
+      - ./data/grafana:/var/lib/grafana
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./web:/usr/share/nginx/html:ro
+    depends_on:
+      - nodered
+      - grafana
+```
+3. Mở PowerShell
+4. Trỏ đến folder chứa project  
+5. Chạy "docker compose up -d"
+<img width="255" height="155" alt="image" src="https://github.com/user-attachments/assets/071e72fe-1f14-45d2-9d76-c071a66ec6f2" />
+   
+### **Bước 3️⃣: cấu hình file nginx**
+```server {
+    listen 80;
+    server_name nguyentuananh095.com www.nguyentuananh095.com;
+
+    root /var/www/nguyentuananh095.com/frontend;
+    index index.html;
+
+    # Gửi request API đến Node-RED (chạy cổng 1880)
+    location /api/ {
+        proxy_pass http://localhost:1880/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    # Tất cả request khác → index.html (SPA)
+    location / {
+        try_files $uri /index.html;
+    }
+
+    access_log /var/log/nginx/nguyentuananh095.access.log;
+    error_log  /var/log/nginx/nguyentuananh095.error.log;
+}
+```
 
