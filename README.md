@@ -149,30 +149,85 @@ services:
 <img width="255" height="155" alt="image" src="https://github.com/user-attachments/assets/071e72fe-1f14-45d2-9d76-c071a66ec6f2" />
    
 ### **Bước 3️⃣: cấu hình file nginx**
-```server {
+- Cấu hình nginx để chạy được website qua url http://nguyentuananh095.com  (thay fullname bằng chuỗi ko dấu viết liền tên của bạn)
+ - Cấu hình nginx để http://nguyentuananh095.com/nodered truy cập vào nodered qua cổng 80, (dù nodered đang chạy ở port 1880)
+ - Cấu hình nginx để http://nguyentuananh095.com/grafana truy cập vào grafana qua cổng 80, (dù grafana đang chạy ở port 3000)
+```events {}
+
+http {
+  server {
     listen 80;
-    server_name nguyentuananh095.com www.nguyentuananh095.com;
+    server_name nguyentuananh095.com;
 
-    root /var/www/nguyentuananh095.com/frontend;
-    index index.html;
-
-    # Gửi request API đến Node-RED (chạy cổng 1880)
-    location /api/ {
-        proxy_pass http://localhost:1880/;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-    }
-
-    # Tất cả request khác → index.html (SPA)
+    # Website chính (index.html)
     location / {
-        try_files $uri /index.html;
+      root /usr/share/nginx/html;
+      index index.html;
+      try_files $uri $uri/ =404;
     }
 
-    access_log /var/log/nginx/nguyentuananh095.access.log;
-    error_log  /var/log/nginx/nguyentuananh095.error.log;
+    # --- Proxy tới Node-RED ---
+    location /nodered/ {
+      proxy_pass http://nodered:1880/;
+      proxy_http_version 1.1;
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+      proxy_cache_bypass $http_upgrade;
+
+      # Xử lý redirect nội bộ để không mất /nodered/
+      proxy_redirect / /nodered/;
+    }
+
+    # --- Proxy tới Grafana ---
+    location /grafana/ {
+      proxy_pass http://grafana:3000/;
+      proxy_http_version 1.1;
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+      proxy_cache_bypass $http_upgrade;
+
+      # Giữ prefix /grafana/
+      proxy_redirect / /grafana/;
+    }
+  }
 }
 ```
+## **4. Lập trình web frontend+backend**
+ ### 4.1 Web thương mại điện tử
+ - Tạo web dạng Single Page Application (SPA), chỉ gồm 1 file index.html, toàn bộ giao diện do javascript sinh động.
+   <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/3edaa756-1a56-41ab-8969-5081bc495da1" />
 
+ - Có tính năng login, lưu phiên đăng nhập vào cookie và session
+   <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/6e48a11d-a1d5-4741-a85f-d9f6eac29226" />
+
+   Thông tin login lưu trong cơ sở dữ liệu của mariadb, được dev quản trị bằng phpmyadmin, yêu cầu sử dụng mã hoá khi gửi login.
+  <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/c74a25d4-6d6c-4c89-8018-063ca73a7e11" />
+
+   Chỉ cần login 1 lần, bao giờ logout thì mới phải login lại.
+ - Có tính năng liệt kê các sản phẩm bán chạy ra trang chủ
+   <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/658457ff-8940-423d-9625-f151828398fb" />
+
+ - Có tính năng liệt kê các nhóm sản phẩm
+   <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/73f299bd-7964-4f7c-8d57-9c94215364f7" />
+
+ - Có tính năng liệt kê sản phẩm theo nhóm
+ - Có tính năng tìm kiếm sản phẩm
+   <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/5f648877-9179-4dd7-8b1d-18aa9788b8c8" />
+
+ - Có tính năng chọn sản phẩm (đưa sản phẩm vào giỏ hàng, thay đổi số lượng sản phẩm trong giỏ, cập nhật tổng tiền)
+   <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/fc89349d-a408-4467-9e1b-c6a226a5573d" />
+
+ - Có tính năng đặt hàng, nhập thông tin giao hàng => được 1 đơn hàng.
+   <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/973221bc-9b30-4329-9bba-54c3d8505dcc" />
+
+ - Có tính năng dành cho admin: Thống kê xem có bao nhiêu đơn hàng, call để xác nhận và cập nhật thông tin đơn hàng. chuyển cho bộ phận đóng gói, gửi bưu điện, cập nhật mã COD, tình trạng giao hàng, huỷ hàng,...
+ - Có tính năng dành cho admin: biểu đồ thống kê số lượng mặt hàng bán được trong từng ngày. (sử dụng grafana)
+   
+   Bài em chưa có tính năng này cho admin;
+ - backend: sử dụng nodered xử lý request gửi lên từ javascript, phản hồi về json.
+   <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/9b36a913-df9e-4c09-9c03-a9d8d5a3f3ed" />
+    <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/d83d3334-6163-4179-9c89-65ca19239265" />
