@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Shop FE - Demo</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { padding-top: 70px; }
+    .product-card { min-height: 260px; }
+    .cursor-pointer { cursor: pointer; }
+    .badge-qty { font-size: 0.75rem; }
+    .hot-list { max-height: 420px; overflow:auto; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="#">MyShop</a>
+    <div class="collapse navbar-collapse" id="navMain">
+      <ul class="navbar-nav me-auto">
+        <li class="nav-item"><a class="nav-link active" href="#" id="nav-products">Sản phẩm</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" id="nav-orders">Đơn hàng</a></li>
+      </ul>
+      <div class="d-flex align-items-center">
+        <div id="user-info" class="text-white me-2"></div>
+        <button class="btn btn-success me-2" id="btn-login">Login</button>
+        <button class="btn btn-danger" id="btn-logout" style="display:none">Logout</button>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<div class="container mt-4">
+  <div class="row g-4">
+    <div class="col-lg-8">
+      <h4>Sản phẩm</h4>
+      <div class="d-flex mb-2">
+        <input id="input-search" class="form-control me-2" placeholder="Tìm sản phẩm...">
+        <button class="btn btn-primary" id="btn-search">Tìm</button>
+      </div>
+      <select id="select-group" class="form-select mb-3" style="width:220px"></select>
+      <div id="products-row" class="row gy-3"></div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card mb-3">
+        <div class="card-body">
+          <h5>Giỏ hàng <span id="cart-count" class="badge bg-primary">0</span></h5>
+          <div id="cart-items"></div>
+          <div class="mt-2 d-flex justify-content-between">
+            <strong>Tổng:</strong><strong id="cart-total">0 ₫</strong>
+          </div>
+          <button class="btn btn-success mt-2 w-100" id="btn-checkout">Thanh toán</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-body">
+          <h6>Hot items</h6>
+          <div id="hot-list" class="hot-list list-group"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="orders-view" style="display:none" class="mt-4">
+    <h4>Đơn hàng của tôi</h4>
+    <div id="orders-list" class="list-group"></div>
+  </div>
+</div>
+
+<!-- Modal Login -->
+<div class="modal fade" id="modalLogin" tabindex="-1">
+  <div class="modal-dialog">
+    <form id="form-login" class="modal-content">
+      <div class="modal-header"><h5>Đăng nhập</h5></div>
+      <div class="modal-body">
+        <input id="login-username" class="form-control mb-2" placeholder="Username" required>
+        <input id="login-password" type="password" class="form-control mb-2" placeholder="Password" required>
+        <div id="login-alert" class="alert alert-danger d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+        <button class="btn btn-primary" type="submit">Login</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Checkout -->
+<div class="modal fade" id="modalCheckout" tabindex="-1">
+  <div class="modal-dialog">
+    <form id="form-checkout" class="modal-content">
+      <div class="modal-header"><h5>Thanh toán</h5></div>
+      <div class="modal-body">
+        <input id="order-name" class="form-control mb-2" placeholder="Tên khách hàng" required>
+        <input id="order-phone" class="form-control mb-2" placeholder="Số điện thoại" required>
+        <textarea id="order-address" class="form-control mb-2" placeholder="Địa chỉ" required></textarea>
+        <div id="checkout-alert" class="alert alert-danger d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+        <button class="btn btn-success" type="submit">Xác nhận</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const API_BASE = 'http://nguyentuananh095.com/nodered';
+const CREDENTIALS = 'include';
+let token = localStorage.getItem('session_token') || '';
+let cart = {};
+let currentUser = null;
+
+// utils
+function apiUrl(p){return API_BASE + p;}
+function authHeaders(){const h={'Content-Type':'application/json'};if(token)h['x-session-token']=token;return h;}
+function money(v){return new Intl.NumberFormat('vi-VN').format(v)+' ₫';}
+function escapeHtml(s){return String(s||'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');}
+function setToken(t){token=t||'';if(token)localStorage.setItem('session_token',token);else localStorage.removeItem('session_token');updateUserUI();}
+
+// API
+async function GET(path,params={}){
+  const qs=Object.entries(params).map(([k,v])=>`${k}=${encodeURIComponent(v)}`).join('&');
+  const res=await fetch(apiUrl(path)+(qs?'?'+qs:''),{headers:authHeaders(),credentials:CREDENTIALS});
+  return res.json();
+}
+async function POST(path,body){
+  const res=await fetch(apiUrl(path),{method:'POST',headers:authHeaders(),credentials:CREDENTIALS,body:JSON.stringify(body)});
+  return res.json();
+}
+
+// UI refs
+const selectGroup=document.getElementById('select-group');
+const productsRow=document.getElementById('products-row');
+const cartItemsEl=document.getElementById('cart-items');
+const cartCountEl=document.getElementById('cart-count');
+const cartTotalEl=document.getElementById('cart-total');
+const hotListEl=document.getElementById('hot-list');
+const userInfoEl=document.getElementById('user-info');
+const btnLogin=document.getElementById('btn-login');
+const btnLogout=document.getElementById('btn-logout');
+const modalLogin=new bootstrap.Modal(document.getElementById('modalLogin'));
+const modalCheckout=new bootstrap.Modal(document.getElementById('modalCheckout'));
+
+// init
+document.addEventListener('DOMContentLoaded',()=>{loadGroups();loadProducts();loadHot();updateUserUI();});
+
+// load groups
+async function loadGroups(){
+  const res=await GET('/api/groups');
+  selectGroup.innerHTML='<option value="">Tất cả nhóm</option>';
+  (res||[]).forEach(g=>{
+    const id=g.id||g.category_id;
+    const name=g.name||g.category_name;
+    selectGroup.innerHTML+=`<option value="${id}">${escapeHtml(name)}</option>`;
+  });
+}
+selectGroup.addEventListener('change',()=>loadProducts());
+
+// load products
+async function loadProducts(){
+  const q=document.getElementById('input-search').value;
+  const group=selectGroup.value;
+  const res=await GET('/api/products',{q,group});
+  productsRow.innerHTML='';
+  (res||[]).forEach(p=>{
+    const col=document.createElement('div');
+    col.className='col-md-4';
+    col.innerHTML=`
+      <div class="card h-100">
+        <img src="${p.image_url||'https://via.placeholder.com/400x240?text=No+Image'}" class="card-img-top" style="height:160px;object-fit:cover">
+        <div class="card-body d-flex flex-column">
+          <h6>${escapeHtml(p.name)}</h6>
+          <div class="mt-auto d-flex justify-content-between align-items-center">
+            <strong>${money(p.price||0)}</strong>
+            <button class="btn btn-sm btn-primary" data-add="${p.id}">Thêm</button>
+          </div>
+        </div>
+      </div>`;
+    productsRow.appendChild(col);
+  });
+  productsRow.querySelectorAll('[data-add]').forEach(b=>b.addEventListener('click',e=>{
+    const id=e.target.dataset.add;
+    const p=(res||[]).find(x=>x.id==id);
+    if(p)addToCart(p);
+  }));
+}
+document.getElementById('btn-search').addEventListener('click',()=>loadProducts());
+
+// load hot
+async function loadHot(){
+  const res=await GET('/api/hot');
+  hotListEl.innerHTML='';
+  (res||[]).forEach(h=>{
+    const item=document.createElement('a');
+    item.className='list-group-item d-flex justify-content-between';
+    item.innerHTML=`<div>${escapeHtml(h.name)}</div><span>${money(h.price||0)}</span>`;
+    hotListEl.appendChild(item);
+  });
+}
+
+// cart
+function addToCart(p){const id=p.id;if(!cart[id])cart[id]={p,qty:0};cart[id].qty++;updateCart();}
+function updateCart(){
+  cartItemsEl.innerHTML='';let total=0;let count=0;
+  Object.values(cart).forEach(c=>{
+    total+=c.p.price*c.qty;count+=c.qty;
+    const div=document.createElement('div');
+    div.className='d-flex justify-content-between align-items-center';
+    div.innerHTML=`<div>${escapeHtml(c.p.name)} x ${c.qty}</div><div>${money(c.p.price*c.qty)}</div>`;
+    cartItemsEl.appendChild(div);
+  });
+  cartCountEl.textContent=count;
+  cartTotalEl.textContent=money(total);
+}
+
+// checkout
+document.getElementById('btn-checkout').addEventListener('click',()=>{
+  if(!Object.keys(cart).length)return alert('Giỏ hàng trống');
+  modalCheckout.show();
+});
+document.getElementById('form-checkout').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const name=document.getElementById('order-name').value;
+  const phone=document.getElementById('order-phone').value;
+  const address=document.getElementById('order-address').value;
+  const items=Object.values(cart).map(c=>({product_id:c.p.id,qty:c.qty,price:c.p.price}));
+  const res=await POST('/api/orders',{customer_name:name,phone,address,items});
+  if(res.success){alert('Đặt hàng thành công');cart={};updateCart();modalCheckout.hide();}
+  else alert(res.message||'Lỗi');
+});
+
+// login/logout
+btnLogin.addEventListener('click',()=>modalLogin.show());
+document.getElementById('form-login').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const username=document.getElementById('login-username').value;
+  const password=document.getElementById('login-password').value;
+  const res=await POST('/api/login',{username,password_hash: password});
+  if(res.success){setToken(res.token);currentUser=res.user;modalLogin.hide();}
+  else {const a=document.getElementById('login-alert');a.textContent=res.message||'Sai tài khoản';a.classList.remove('d-none');}
+});
+btnLogout.addEventListener('click',()=>{setToken('');currentUser=null;document.cookie="session_token=; Path=/; Max-Age=0";});
+
+// user UI
+function updateUserUI(){
+  if(token){userInfoEl.textContent='Đã đăng nhập';btnLogin.style.display='none';btnLogout.style.display='inline-block';}
+  else {userInfoEl.textContent='';btnLogin.style.display='inline-block';btnLogout.style.display='none';}
+}
+</script>
+</body>
+</html>
